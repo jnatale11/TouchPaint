@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" href = "css/hax.css">
+    <script src="//js.leapmotion.com/leap-0.6.4.min.js"></script>
+    <script src="//js.leapmotion.com/leap-plugins-0.1.11.min.js"></script>
+    <title>DANKHAX</title>
+  </head>
+  <body>
+    <div class="top_row">
+        <h1>TouchPaint | Created by Jason Natale</h1>
+    </div>
+    <div class="top_row" id="guide">
+	<a href="http://www.natalemedical.com/tp_tut.html">Getting Started</a>
+    </div>
+    <canvas id="myCanvas" width="1350" height="500" style="border:1px solid #000;"></canvas>
+    <div id="maincol" class=""></div>
+  </body>
+  <script type="text/javascript">
+   //outlining areas to show color being used
+   var can = document.getElementById("myCanvas");
+   var draw = can.getContext('2d');
+   var drawing = new Image();
+   drawing.src = 'wheel.png';
+   drawing.onload = function(){
+	draw.drawImage(drawing,1220,380);
+   };
+   draw.beginPath();
+   draw.arc(1286,447,20,0,2*Math.PI);
+   draw.fillStyle = 'red';
+   draw.fill();
+
+   //tracers to show where fingers are
+   var tracers = {};
+   //high order function
+   var Tracer = function(){
+	var tra = this;
+	var im = document.createElement('img');
+	im.src = 'circ.gif';
+	im.style.position = 'absolute';
+	im.style.width = '30px';
+	im.style.height = '30px';
+	im.onload = function(){
+	    //place image on screen
+	    document.body.appendChild(im);
+	}
+	tra.Transform = function(position){
+	    im.style.left = position[0]/250*1350/2 +1350/2- 7  + 'px';
+	    im.style.top = 500 - position[1]/350*500 -7 +'px';
+	};
+   };
+   //boolean determines whether or not a screenshot can be taken
+   var pic = false;
+
+   //used to display color selected
+   function changeCol(color){
+	var c = document.getElementById('myCanvas');
+	var ctx = c.getContext('2d');
+	ctx.fillStyle = color;
+	draw.beginPath();
+   	draw.arc(1286,447,20,0,2*Math.PI);
+   	draw.fill();
+	var colordiv = document.getElementById('maincol');
+	colordiv.className = color;
+   }
+
+   //used to iteratively draw
+   function drawSingular(height,width,color){
+     //translate relative height and width values to definitive pixel
+     //locations within convas
+     var XBound = 250;
+     var YBound = 350;
+     var XPos = width/XBound*1350/2 + 1350/2;
+     var YPos = 500 - height/YBound*500;
+     //draw circle
+     var c = document.getElementById("myCanvas");
+     var ctx = c.getContext("2d");
+     ctx.beginPath();
+     ctx.arc(XPos,YPos,11,0,2*Math.PI);
+     ctx.fillStyle = color;
+     ctx.fill();
+     //after drawing you can take a picture
+     pic = true;
+   }
+   //known colors are blue,red,yellow,green,black,purple,gray,white
+
+   //takes finger and draws with it
+   function TraceFing(finger,id){
+	var pos = finger.stabilizedTipPosition;
+	//add tracing information regardless
+	var currTracer = (tracers[id] || (tracers[id] = new Tracer()));
+	currTracer.Transform(pos);
+	//needs to be close or towards screen
+	if(pos[2]<0){
+	  var coldiv = document.getElementById("maincol");
+	  drawSingular(pos[1],pos[0],coldiv.className);
+	}
+   }
+   
+   //loop checking location of hand to color
+   Leap.loop(function(frame){
+     //make sure one hand is registered
+     if(frame.hands.length == 1){
+	var hand = frame.hands[0];
+	//check index and middle finger on hand
+	var ind = hand.indexFinger;
+	var mid = hand.middleFinger;
+	//if neither pointing, choosing next color
+	//determine by dot product with negative z vector
+	var nz = [0,0,-1];
+	var dotind = Leap.vec3.dot(ind.direction,nz);
+	var dotmid = Leap.vec3.dot(mid.direction,nz);
+	//case of color selection
+	if(dotind<.3 && dotmid<.3){
+	  //take rotation of palm and go off color wheel to choose color
+	  var norm = hand.palmNormal;
+	  //only account for x, y elements of direction when choosing color
+	  //compare to y vector and x with dot products to determine color chosen
+	  var y = [0,1,0];
+	  var x = [1,0,0];
+ 	  var dot = Leap.vec3.dot(norm,y);
+	  var dot2 = Leap.vec3.dot(norm,x);
+	  //purple or red
+	  if(dot>.3){
+	    if(dot2>0)
+		changeCol('red');
+	    else
+		changeCol('purple');
+	  }
+	  //green or yellow
+	  else if(dot<-.3){
+	    if(dot2>0)
+		changeCol('yellow');
+	    else
+		changeCol('green');
+	  }
+	  //blue or orange
+	  else{
+	    if(dot2>0)
+		changeCol('orange');
+	    else
+		changeCol('blue');
+	  }
+	}
+	else{
+	   //draw fingers that matter (pointing towards screen)
+	   if(dotind>.75 && ind.extended){
+		TraceFing(ind,0);
+	   }
+	   if(dotmid>.75 && mid.extended){
+		TraceFing(mid,1);
+	   }
+	}
+     }
+     else if(frame.hands.length == 2){
+	//saves picture!
+	if(pic){
+	var canvas = document.getElementById('myCanvas');
+	var dataURL = canvas.toDataURL();
+	//loop to find highest id to create new image and post
+	for(var i=0;i>-1;i++){
+	    if(!document.getElementById('canvasImg'+i)){
+	    //make new image element and add it
+	    var newimg = document.createElement('img');
+	    newimg.id = 'canvasImg'+i;
+	    newimg.src = dataURL;
+	    document.body.appendChild(newimg);
+	    break;
+	    }
+	}
+	pic = false;
+	}
+	//can clear canvas as well
+	else{
+	    var h1 = frame.hands[0];
+	    var h2 = frame.hands[1];
+	    //average two hand heights, if low enough and clenched clear
+	    var height = (h1.palmPosition[1] + h2.palmPosition[1])/2;
+	    var radius = (h1.sphereRadius +h2.sphereRadius)/2;
+	    console.log(height+' '+radius);
+	    if(height < 135 && radius <100){
+	        //erase canvas and put color wheel back on
+	        var can = document.getElementById("myCanvas");
+   		var draw = can.getContext('2d');
+		draw.fillStyle = 'white';
+		draw.fillRect(0,0,1350,500);
+   		var drawing = new Image();
+   		drawing.src = 'wheel.png';
+   		drawing.onload = function(){
+		draw.drawImage(drawing,1220,380);
+   		};
+   		draw.beginPath();
+   		draw.arc(1286,447,20,0,2*Math.PI);
+   		draw.fillStyle = 'red';
+   		draw.fill();
+	    }
+	}
+     }
+   }).use('screenPosition', {scale: 0.5});
+  </script>
+</html>

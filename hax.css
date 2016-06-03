@@ -1,0 +1,15 @@
+.top_row{
+display: inline block;
+max-width: 49%;
+color: blue;
+float: left;
+vertical-align: center;
+margin: 22px 22px;
+}
+h1{
+margin: 0;
+}
+#guide{
+float: right;
+margin:32px 32px;
+}
